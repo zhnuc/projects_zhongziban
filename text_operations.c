@@ -14,6 +14,10 @@
 #define CURSOR_RIGHT "\033[C"
 #define CURSOR_UP "\033[A"
 #define CURSOR_DOWN "\033[B"
+#define CURSOR_HOME "\033[H"      // 光标移动到行首
+#define CURSOR_END "\033[4~"       // 光标移动到行尾
+#define CURSOR_PGUP "\033[5~"     // 向上翻页
+#define CURSOR_PGDN "\033[6~"     // 向下翻页
 #define BACKSPACE_SEQ "\033[D \033[D"  // 左移+空格+左移，模拟退格
 
 // 特殊键值 - 使用远离ASCII范围的值
@@ -25,9 +29,8 @@
 #define KEY_DEL     1004
 #define KEY_HOME    1005
 #define KEY_END     1006
-
-// 调试模式开关
-#define DEBUG_MODE 1
+#define KEY_PGUP    1007
+#define KEY_PGDN    1008
 
 // 读取按键，处理多字节序列（如箭头键）
 int read_key() {
@@ -53,7 +56,18 @@ int read_key() {
                 case 'C': return KEY_RIGHT;
                 case 'D': return KEY_LEFT;
                 case 'H': return KEY_HOME;
-                case 'F': return KEY_END;
+                case '4': 
+                    if (read(STDIN_FILENO, &seq[2], 1) != 1) return KEY_ESC; 
+                    if (seq[2] == '~') return KEY_END; 
+                    break;
+                case '5': // 读取第四个字节，确认是 Page Up
+                    if (read(STDIN_FILENO, &seq[2], 1) != 1) return KEY_ESC;
+                    if (seq[2] == '~') return KEY_PGUP;
+                    break;
+                case '6': // 读取第四个字节，确认是 Page Down
+                    if (read(STDIN_FILENO, &seq[2], 1) != 1) return KEY_ESC;
+                    if (seq[2] == '~') return KEY_PGDN;
+                    break;
             }
         }
         
@@ -64,12 +78,7 @@ int read_key() {
     }
 }
 
-// 移动光标到指定位置 (1,1是左上角)
-void move_cursor_to(int x, int y) {
-    char buf[32];
-    int len = snprintf(buf, sizeof(buf), "\033[%d;%dH", y, x);
-    write(STDOUT_FILENO, buf, len);
-}
+// 在缓冲区中添加转义序列的函数
 
 // 在缓冲区中添加转义序列
 void add_escape_sequence(char *buffer, int *pos, const char *seq) {
@@ -105,28 +114,32 @@ void text_op(char c) {
         
         if (key == 'q') break;  // 退出条件
         
-        // 初始化用于调试的信息字符串
-        char debug_info[128];
-        
         // 处理特殊按键
         if (key == KEY_LEFT) {
-            snprintf(debug_info, sizeof(debug_info), "左箭头键");
             add_escape_sequence(buffer, &buffer_pos, CURSOR_LEFT);
         } 
         else if (key == KEY_RIGHT) {
-            snprintf(debug_info, sizeof(debug_info), "右箭头键");
             add_escape_sequence(buffer, &buffer_pos, CURSOR_RIGHT);
         } 
         else if (key == KEY_UP) {
-            snprintf(debug_info, sizeof(debug_info), "上箭头键");
             add_escape_sequence(buffer, &buffer_pos, CURSOR_UP);
         } 
         else if (key == KEY_DOWN) {
-            snprintf(debug_info, sizeof(debug_info), "下箭头键");
             add_escape_sequence(buffer, &buffer_pos, CURSOR_DOWN);
         } 
+        else if (key == KEY_HOME) {
+            add_escape_sequence(buffer, &buffer_pos, CURSOR_HOME);
+        }
+        else if (key == KEY_END) {
+            add_escape_sequence(buffer, &buffer_pos, CURSOR_END);
+        }
+        else if (key == KEY_PGUP) {
+            add_escape_sequence(buffer, &buffer_pos, CURSOR_PGUP);
+        }
+        else if (key == KEY_PGDN) {
+            add_escape_sequence(buffer, &buffer_pos, CURSOR_PGDN);
+        }
         else if (key == '\r' || key == '\n') {
-            snprintf(debug_info, sizeof(debug_info), "回车键");
             if (buffer_pos + 2 < BUFFER_SIZE) {
                 buffer[buffer_pos++] = '\r';
                 buffer[buffer_pos++] = '\n';
@@ -134,21 +147,16 @@ void text_op(char c) {
             }
         } 
         else if (key == 127 || key == 8) { // 退格键
-            snprintf(debug_info, sizeof(debug_info), "退格键");
             if (buffer_pos > 0) {
                 // 使用左移+空格+左移序列模拟退格
                 add_escape_sequence(buffer, &buffer_pos, BACKSPACE_SEQ);
             }
         } 
         else if (key >= 32 && key < 127) { // 可打印ASCII字符
-            snprintf(debug_info, sizeof(debug_info), "字符: %c", key);
             if (buffer_pos + 1 < BUFFER_SIZE) {
                 buffer[buffer_pos++] = key;
                 buffer[buffer_pos] = '\0';
             }
-        } 
-        else {
-            snprintf(debug_info, sizeof(debug_info), "未知按键: %d", key);
         }
         
         // 清屏并重新显示内容
