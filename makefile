@@ -1,8 +1,9 @@
-editor:main.o editor.o
+editor:main.o editor.o text_operations.o
 	gcc main.o editor.o text_operations.o -o editor
 
 main.o:main.c
 	gcc main.c -std=c99 -c -Wall -g -o main.o
+	
 editor.o:editor.c
 	gcc -c editor.c -std=c99 -Wall -g -o editor.o
 	
