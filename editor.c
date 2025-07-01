@@ -2,10 +2,20 @@
 #include <unistd.h>
 #include <termios.h>
 #include "editor.h"
+#include <errno.h>
+
+struct termios orig_termios;
 
 void enableRawMode() {
     struct termios raw;
-    tcgetattr(STDIN_FILENO, &raw);
+    
+    // 保存原始终端设置
+    if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) {
+        perror("tcgetattr");
+        return;
+    }
+    
+    raw = orig_termios; // 从原始设置开始修改
     
     // 修改 raw.c_lflag 来禁用终端的一些本地模式
     // 禁用 ECHO: 关闭回显
@@ -25,40 +35,21 @@ void enableRawMode() {
     raw.c_cflag |= (CS8);
 
     // 设置控制字符
-    // VMIN = 0: read() 至少读取 0 个字节
-    // VTIME = 1000: read() 超时时间为 1000ms
-    raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 1000;
+    // VMIN = 1: read() 至少读取 1 个字节才返回
+    // VTIME = 0: 不设置超时，read() 会一直等待直到读取到至少一个字节
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
 
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+    // 应用新的终端设置
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) {
+        perror("tcsetattr");
+        return;
+    }
 }
 
 void disableRawMode() {
-    struct termios orig_termios;
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    
-    // 恢复原始终端设置
-    orig_termios.c_lflag |= (ECHO | ICANON | ISIG | IEXTEN);
-    orig_termios.c_iflag |= (IXON | ICRNL | BRKINT | INPCK | ISTRIP);
-    orig_termios.c_oflag |= (OPOST);
-    orig_termios.c_cflag |= (CS8);
-    
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-}
-
-int main() {
-    char c;
-    enableRawMode();
-    while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
-        if (c == '\r' | c == '\n') {
-            write(STDOUT_FILENO, "\r\n", 2);
-        }
-        write(STDOUT_FILENO, &c, 1);
-        //显示按键的ASCII值，包括控制字符
-        printf("Key pressed: %d\n", c); // 打印按键的ASCII值
-        fflush(stdout); // 确保输出立即刷新
-
+    // 直接恢复之前保存的原始终端设置
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) {
+        perror("tcsetattr");
     }
-    disableRawMode();
-    return 0;
 }
