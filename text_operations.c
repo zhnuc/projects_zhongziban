@@ -15,7 +15,7 @@
 #define CURSOR_UP "\033[A"
 #define CURSOR_DOWN "\033[B"
 #define CURSOR_HOME "\033[H"      // 光标移动到行首
-#define CURSOR_END "\033[4~"       // 光标移动到行尾
+#define CURSOR_END "\033[F"       // 光标移动到行尾
 #define CURSOR_PGUP "\033[5~"     // 向上翻页
 #define CURSOR_PGDN "\033[6~"     // 向下翻页
 #define BACKSPACE_SEQ "\033[D \033[D"  // 左移+空格+左移，模拟退格
@@ -56,6 +56,7 @@ int read_key() {
                 case 'C': return KEY_RIGHT;
                 case 'D': return KEY_LEFT;
                 case 'H': return KEY_HOME;
+                case 'F': return KEY_END;
                 case '4': 
                     if (read(STDIN_FILENO, &seq[2], 1) != 1) return KEY_ESC; 
                     if (seq[2] == '~') return KEY_END; 
