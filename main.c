@@ -27,7 +27,7 @@ int main(){
         } else if (c > 0) {
             // 显示按键信息（使用 write 避免行缓冲问题）
             char buf[32];
-            int len = snprintf(buf, sizeof(buf), " %c (ASCII: %d)\r\n", c, c);
+            int len = snprintf(buf, sizeof(buf), " %c (ASCII: %d)", c, c);
             write(STDOUT_FILENO, buf, len);
         }
     }
